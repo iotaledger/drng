@@ -1,0 +1,83 @@
+version: '3'
+
+services:
+  goshimmer-node:
+    container_name: iota_goshimmer
+    image: angelocapossele/goshimmer:develop
+    volumes:
+      - ./mainnetdb/:/mainnetdb/:rw
+      - ./config.json:/config.json:ro
+    networks: 
+      - drandnetwork
+    ports:
+      - "14666:14666/tcp"
+      - "14626:14626/udp"
+      - "8080:8080/tcp"
+  drand-client-1:
+    container_name: drand1
+    image: angelocapossele/drand:latest
+    entrypoint: /data/client-script.sh
+    volumes:
+      - ./data:/data:z
+    networks: 
+      - drandnetwork
+    ports:
+      - "8000:8000/tcp"
+    environment:
+      PORT: 8000
+      LEADER: 1
+  drand-client-2:
+    container_name: drand2
+    image: angelocapossele/drand:latest
+    entrypoint: /data/client-script.sh
+    volumes:
+      - ./data:/data:z
+    networks: 
+      - drandnetwork
+    ports:
+      - "8001:8001/tcp"
+    environment:
+      PORT: 8001
+  drand-client-3:
+    container_name: drand3
+    image: angelocapossele/drand:latest
+    entrypoint: /data/client-script.sh
+    volumes:
+      - ./data:/data:z
+    networks: 
+      - drandnetwork
+    ports:
+      - "8002:8002/tcp"
+    environment:
+      PORT: 8002
+  drand-client-4:
+    container_name: drand4
+    image: angelocapossele/drand:latest
+    entrypoint: /data/client-script.sh
+    volumes:
+      - ./data:/data:z
+    networks: 
+      - drandnetwork
+    ports:
+      - "8003:8003/tcp"
+    environment:
+      PORT: 8003
+  drand-client-5:
+    container_name: drand5
+    image: angelocapossele/drand:latest
+    entrypoint: /data/client-script.sh
+    volumes:
+      - ./data:/data:z
+    networks: 
+      - drandnetwork
+    ports:
+      - "8004:8004/tcp"
+    environment:
+      PORT: 8004
+
+networks:
+  drandnetwork:
+    ipam:
+      driver: default
+      config:
+          - subnet: 172.16.222.0/24
