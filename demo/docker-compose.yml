@@ -13,6 +13,7 @@ services:
       - "14666:14666/tcp"
       - "14626:14626/udp"
       - "8080:8080/tcp"
+      - "8081:8081/tcp"
   drand-client-1:
     container_name: drand1
     image: angelocapossele/drand:latest

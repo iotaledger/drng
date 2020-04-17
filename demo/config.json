@@ -31,9 +31,9 @@
   "drng": {
     "instanceId": 1,
     "threshold": 3,
-    "distributedPubKey": "a02fcd15edd52c8e134027491a43b597505b466d1679e88f70f927e57c45a93ae0765ff02fc2d015e3a02fd8748e2103",
+    "distributedPubKey": "8ed27b059bbb314966660d1fb2ce5b146e6af33d729ab434c5024049c7b9f826eb354db991e4e81d4c820d2d024c8c2b",
     "committeeMembers": [
-      "rlJ4FZUzX3SFg63VzwG5LOl91TfJmfHRB3heVbsHvRY="
+      "1807041d28e63ead53a9dc26f3e59fc6917be2b1e3f79dd0a2f4d58732ddcfd7"
     ]
   },
   "gossip": {
@@ -65,7 +65,7 @@
     "externalAddress": "auto"
   },
   "node": {
-    "disablePlugins": [],
+    "disablePlugins": "portcheck",
     "enablePlugins": []
   },
   "webapi": {
