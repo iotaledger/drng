@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/drand/drand/core"
 	"github.com/drand/drand/key"
 	"github.com/drand/drand/metrics"
+	"github.com/drand/drand/metrics/pprof"
 	"github.com/urfave/cli/v2"
 )
 
@@ -17,34 +17,30 @@ func startCmd(c *cli.Context) error {
 	// determine if we already ran a DKG or not
 	_, errG := fs.LoadGroup()
 	_, errS := fs.LoadShare()
-	_, errD := fs.LoadDistPublic()
 	// XXX place that logic inside core/ directly with only one method
-	freshRun := errG != nil || errS != nil || errD != nil
+	freshRun := errG != nil || errS != nil
 	var err error
 	if freshRun {
-		if exit := resetBeaconDB(conf); exit {
-			os.Exit(0)
-		}
 		fmt.Println("drand: will run as fresh install -> expect to run DKG.")
 		drand, err = core.NewDrand(fs, conf)
 		if err != nil {
-			fatal("drand: can't instantiate drand instance %s", err)
+			return fmt.Errorf("can't instantiate drand instance %s", err)
 		}
 	} else {
 		fmt.Println("drand: will already start running randomness beacon")
 		drand, err = core.LoadDrand(fs, conf)
 		if err != nil {
-			fatal("drand: can't load drand instance %s", err)
+			return fmt.Errorf("can't load drand instance %s", err)
 		}
 		// XXX make it configurable so that new share holder can still start if
 		// nobody started.
-		//drand.StartBeacon(!c.Bool(pushFlag.Name))
+		// drand.StartBeacon(!c.Bool(pushFlag.Name))
 		catchup := true
 		drand.StartBeacon(catchup)
 	}
 	// Start metrics server
 	if c.IsSet(metricsFlag.Name) {
-		go metrics.Start(c.Int(metricsFlag.Name))
+		_ = metrics.Start(c.String(metricsFlag.Name), pprof.WithProfile(), drand.PeerMetrics)
 	}
 	<-drand.WaitExit()
 
@@ -52,9 +48,12 @@ func startCmd(c *cli.Context) error {
 }
 
 func stopDaemon(c *cli.Context) error {
-	client := controlClient(c)
-	if _, err := client.Shutdown(); err != nil {
-		fmt.Printf("Error stopping drand daemon: %v\n", err)
+	ctrlClient, err := controlClient(c)
+	if err != nil {
+		return err
+	}
+	if _, err := ctrlClient.Shutdown(); err != nil {
+		return fmt.Errorf("error stopping drand daemon: %w", err)
 	}
 	fmt.Println("drand daemon stopped correctly. Bye.")
 	return nil

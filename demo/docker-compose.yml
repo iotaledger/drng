@@ -16,65 +16,56 @@ services:
       - "8081:8081/tcp"
   drand-client-1:
     container_name: drand1
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:develop
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
+    # volumes:
+    #   - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
       - "8000:8000/tcp"
     environment:
-      PORT: 8000
       LEADER: 1
   drand-client-2:
     container_name: drand2
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:develop
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
+    # volumes:
+    #   - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8001:8001/tcp"
-    environment:
-      PORT: 8001
+      - "8001:8000/tcp"
   drand-client-3:
     container_name: drand3
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:develop
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
+    # volumes:
+    #   - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8002:8002/tcp"
-    environment:
-      PORT: 8002
+      - "8002:8000/tcp"
   drand-client-4:
     container_name: drand4
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:develop
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
+    # volumes:
+    #   - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8003:8003/tcp"
-    environment:
-      PORT: 8003
+      - "8003:8000/tcp"
   drand-client-5:
     container_name: drand5
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:develop
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
+    # volumes:
+    #   - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8004:8004/tcp"
-    environment:
-      PORT: 8004
+      - "8004:8000/tcp"
 
 networks:
   drandnetwork:

@@ -1,115 +1,137 @@
 package main
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
 	gonet "net"
+	"os"
 
+	"github.com/drand/drand/chain"
+	"github.com/drand/drand/client"
+	"github.com/drand/drand/client/grpc"
 	"github.com/drand/drand/core"
 	"github.com/drand/drand/net"
-	"github.com/drand/drand/protobuf/drand"
-	"github.com/nikkolasg/slog"
 	"github.com/urfave/cli/v2"
 )
 
 func getPrivateCmd(c *cli.Context) error {
 	if !c.Args().Present() {
-		slog.Fatal("Get private takes a group file as argument.")
+		return errors.New("get private takes a group file as argument")
 	}
 	defaultManager := net.NewCertManager()
 	if c.IsSet("tls-cert") {
-		defaultManager.Add(c.String("tls-cert"))
+		if err := defaultManager.Add(c.String("tls-cert")); err != nil {
+			return err
+		}
 	}
-	ids := getNodes(c)
-	client := core.NewGrpcClientFromCert(defaultManager)
+	ids, err := getNodes(c)
+	if err != nil {
+		return err
+	}
+	grpcClient := core.NewGrpcClientFromCert(defaultManager)
 	var resp []byte
-	var err error
 	for _, public := range ids {
-		resp, err = client.Private(public)
+		resp, err = grpcClient.Private(public.Identity)
 		if err == nil {
-			slog.Infof("drand: successfully retrieved private randomness "+
+			fmt.Fprintf(output, "drand: successfully retrieved private randomness "+
 				"from %s", public.Addr)
 			break
 		}
-		slog.Infof("drand: error contacting node %s: %s", public.Addr, err)
+		fmt.Fprintf(output, "drand: error contacting node %s: %s", public.Addr, err)
 	}
 	if resp == nil {
-		slog.Fatalf("drand: zero successful contacts with nodes")
+		return errors.New("zero successful contacts with nodes")
 	}
 
 	type private struct {
 		Randomness []byte
 	}
 
-	printJSON(&private{resp})
-	return nil
+	return printJSON(&private{resp})
 }
 
 func getPublicRandomness(c *cli.Context) error {
 	if !c.Args().Present() {
-		slog.Fatal("Get public command takes a group file as argument.")
+		return errors.New("get public command takes a group file as argument")
 	}
-	client := core.NewGrpcClient()
+	certPath := ""
 	if c.IsSet(tlsCertFlag.Name) {
-		defaultManager := net.NewCertManager()
-		defaultManager.Add(c.String(tlsCertFlag.Name))
-		client = core.NewGrpcClientFromCert(defaultManager)
+		certPath = c.String(tlsCertFlag.Name)
 	}
 
-	ids := getNodes(c)
-	group := getGroup(c)
+	ids, err := getNodes(c)
+	if err != nil {
+		return err
+	}
+	group, err := getGroup(c)
+	if err != nil {
+		return err
+	}
 	if group.PublicKey == nil {
-		slog.Fatalf("drand: group file must contain the distributed public key!")
+		return errors.New("drand: group file must contain the distributed public key")
 	}
 
-	public := group.PublicKey
-	var resp *drand.PublicRandResponse
-	var err error
+	var resp client.Result
 	var foundCorrect bool
 	for _, id := range ids {
-		if c.IsSet(roundFlag.Name) {
-			resp, err = client.Public(id.Addr, public, id.TLS, c.Int(roundFlag.Name))
-		} else {
-			resp, err = client.LastPublic(id.Addr, public, id.TLS)
-		}
-		if err == nil {
-			foundCorrect = true
-			slog.Infof("drand: public randomness retrieved from %s", id.Addr)
+		grpcClient, err := grpc.New(id.Addr, certPath, !id.TLS)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "drand: could not connect to %s: %s", id.Addr, err)
 			break
 		}
-		slog.Printf("drand: could not get public randomness from %s: %s", id.Addr, err)
+
+		resp, err = grpcClient.Get(c.Context, uint64(c.Int(roundFlag.Name)))
+
+		if err == nil {
+			foundCorrect = true
+			if c.Bool(verboseFlag.Name) {
+				fmt.Fprintf(output, "drand: public randomness retrieved from %s", id.Addr)
+			}
+			break
+		}
+		fmt.Fprintf(os.Stderr, "drand: could not get public randomness from %s: %s", id.Addr, err)
 	}
 	if !foundCorrect {
 		return errors.New("drand: could not verify randomness")
 	}
 
-	printJSON(resp)
-	return nil
+	return printJSON(resp)
 }
 
-func getCokeyCmd(c *cli.Context) error {
-	var client = core.NewGrpcClient()
+func getChainInfo(c *cli.Context) error {
+	var grpcClient = core.NewGrpcClient()
 	if c.IsSet(tlsCertFlag.Name) {
 		defaultManager := net.NewCertManager()
 		certPath := c.String(tlsCertFlag.Name)
-		defaultManager.Add(certPath)
-		client = core.NewGrpcClientFromCert(defaultManager)
+		if err := defaultManager.Add(certPath); err != nil {
+			return err
+		}
+		grpcClient = core.NewGrpcClientFromCert(defaultManager)
 	}
-	var dkey *drand.DistKeyResponse
+	var ci *chain.Info
 	for _, addr := range c.Args().Slice() {
 		_, _, err := gonet.SplitHostPort(addr)
 		if err != nil {
-			fatal("invalid address given: %s", err)
+			return fmt.Errorf("invalid address given: %s", err)
 		}
-		dkey, err = client.DistKey(addr, !c.Bool("tls-disable"))
+		ci, err = grpcClient.ChainInfo(net.CreatePeer(addr, !c.Bool("tls-disable")))
 		if err == nil {
 			break
 		}
-		slog.Printf("drand: error fetching distributed key from %s : %s",
+		fmt.Fprintf(os.Stderr, "drand: error fetching distributed key from %s : %s",
 			addr, err)
 	}
-	if dkey == nil {
-		slog.Fatalf("drand: can't retrieve dist. key from all nodes")
+	if ci == nil {
+		return errors.New("drand: can't retrieve dist. key from all nodes")
 	}
-	printJSON(dkey)
-	return nil
+	return printChainInfo(c, ci)
+}
+
+func printChainInfo(c *cli.Context, ci *chain.Info) error {
+	if c.Bool(hashOnly.Name) {
+		fmt.Fprintf(output, "%s\n", hex.EncodeToString(ci.Hash()))
+		return nil
+	}
+	return printJSON(ci.ToProto())
 }

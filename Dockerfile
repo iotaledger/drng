@@ -17,5 +17,7 @@ RUN rm -rf "/go/src/github.com/drand/drand"
 
 WORKDIR /
 
+COPY ./demo/data "/data"
+
 ENTRYPOINT ["drand"]
 

@@ -14,7 +14,8 @@
     "entryNodes": [
       "MRCJTGX9x+PPiT3um1DQSHXvALaUg/tCH/oQr6mliGo=@35.246.104.243:14626"
     ],
-    "port": 14626
+    "port": 14626,
+    "seed": "rUgs+jeNa0g3q9tIP62mSuxmC/Wmc618N/IyvxvWosc="
   },
   "dashboard": {
     "bindAddress": "0.0.0.0:8081",
@@ -31,9 +32,9 @@
   "drng": {
     "instanceId": 1,
     "threshold": 3,
-    "distributedPubKey": "8fe491755cd87913d38a95c4f76f5652bf269e97d41cfefdb09b9af61e2fb71b8d0cdf3083c9bfcbe5202eb0d5e9467e",
+    "distributedPubKey": "a1195421873cf8f4b4d79b33b2443a7d3361f94bd198b69d266e2a7ba22de9b08dc2a42610fc4f57ed4a1e6e150bde1b",
     "committeeMembers": [
-      "7fdjFz4m4Wsy9YibX5EYSWwhA5i45iRX1Y6XKk3zjpW5"
+      "F75z1dtinAAqMuvQuX2tCnhjeVvZyqECzAQuNUHM2dCx"
     ]
   },
   "gossip": {
@@ -65,8 +66,8 @@
     "externalAddress": "auto"
   },
   "node": {
-    "disablePlugins": ["portcheck"],
-    "enablePlugins": ["bootstrap"]
+    "disablePlugins": ["PortCheck"],
+    "enablePlugins": ["Bootstrap"]
   },
   "webapi": {
     "auth": {
