@@ -10,7 +10,7 @@ rm -rf /root/.drand/
 drand generate-keypair --tls-disable "${IP_ADDR_PORT}"
 
 # Boot the drand deamon in background
-nohup drand start --tls-disable --goshimmerAPIurl "$GOSHIMMER" & # add "--verbose 2" here for more details
+nohup drand start --tls-disable --public-listen 0.0.0.0:8081 --goshimmerAPIurl "$GOSHIMMER" & # add "--verbose 2" here for more details
 
 # Wait for all containers to have done the same
 sleep 5

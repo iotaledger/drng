@@ -51,6 +51,7 @@ services:
       - drandnetwork
     ports:
       - "8000:8000/tcp"
+      - "8800:8081/tcp"
     environment:
       LEADER: 1
       GOSHIMMER: "http://peer_master:8080"
@@ -62,6 +63,7 @@ services:
       - drandnetwork
     ports:
       - "8001:8000/tcp"
+      - "8801:8081/tcp"
     environment:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-3:
@@ -72,6 +74,7 @@ services:
       - drandnetwork
     ports:
       - "8002:8000/tcp"
+      - "8802:8081/tcp"
     environment:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-4:
@@ -82,6 +85,7 @@ services:
       - drandnetwork
     ports:
       - "8003:8000/tcp"
+      - "8803:8081/tcp"
     environment:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-5:
@@ -92,6 +96,7 @@ services:
       - drandnetwork
     ports:
       - "8004:8000/tcp"
+      - "8804:8081/tcp"
     environment:
       GOSHIMMER: "http://peer_master:8080"
 
