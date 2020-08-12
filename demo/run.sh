@@ -17,7 +17,7 @@ docker stop -t 60 peer_master
 
 while [ -z "$COLLECTIVE_PUB_KEY" ]
 do
-    COLLECTIVE_PUB_KEY=$(docker exec drand1 drand show chain-info | grep public_key | cut -d'"' -f 4)
+    COLLECTIVE_PUB_KEY=$(docker exec drand2 drand show chain-info | grep public_key | cut -d'"' -f 4)
     sleep 2
 done
 

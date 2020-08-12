@@ -44,8 +44,8 @@ services:
       - entry_node
 
   drand-client-1:
-    container_name: drand1
-    image: angelocapossele/drand:develop
+    container_name: testdrng-drand_0
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -57,7 +57,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-2:
     container_name: drand2
-    image: angelocapossele/drand:develop
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -68,7 +68,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-3:
     container_name: drand3
-    image: angelocapossele/drand:develop
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -79,7 +79,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-4:
     container_name: drand4
-    image: angelocapossele/drand:develop
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -90,7 +90,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-5:
     container_name: drand5
-    image: angelocapossele/drand:develop
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
