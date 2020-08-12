@@ -47,7 +47,7 @@ var (
 const defaultPort = "8000"
 
 func banner() {
-	fmt.Fprintf(output, "drand %v (date %v, commit %v) by nikkolasg\n", version, buildDate, gitCommit)
+	fmt.Fprintf(output, "drand %v (date %v, commit %v) by IOTA\n", version, buildDate, gitCommit)
 }
 
 var folderFlag = &cli.StringFlag{

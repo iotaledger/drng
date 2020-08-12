@@ -10,7 +10,7 @@ ENV GO111MODULE=on
 COPY go.mod .
 COPY go.sum .
 
-RUN go install -ldflags "-X main.version=`git describe --tags` -X main.buildDate=`date -u +%d/%m/%Y@%H:%M:%S` -X main.gitCommit=`git rev-parse HEAD`" 
+RUN go install -ldflags "-X main.buildDate=`date -u +%d/%m/%Y@%H:%M:%S` -X main.gitCommit=`git rev-parse HEAD`" 
 
 # remove sources for compactness
 RUN rm -rf "/go/src/github.com/drand/drand"
@@ -18,6 +18,6 @@ RUN rm -rf "/go/src/github.com/drand/drand"
 WORKDIR /
 
 COPY ./demo/data "/data"
+COPY ./docker/entrypoint.sh "/usr/local/bin/entrypoint.sh"
 
 ENTRYPOINT ["drand"]
-
