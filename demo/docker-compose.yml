@@ -1,80 +1,104 @@
 version: '3'
 
 services:
-  goshimmer-node:
-    container_name: iota_goshimmer
-    image: angelocapossele/goshimmer:develop
+  entry_node:
+    container_name: entry_node
+    image: angelocapossele/goshimmer:drng
+    command: >
+      --autopeering.seed=base58:8kPPCqaJFAt8BJtx6qw5PN8bKEM2XKXor6PxkmHf6bcr
+      --autopeering.entryNodes=
+      --analysis.dashboard.dev=false
+      --metrics.local=false
+      --prometheus.processMetrics=false
+      --node.disablePlugins=portcheck,dashboard,analysis-client,gossip,drng,issuer,syncbeaconfollower,messagelayer,pow,valuetransfers,webapi,webapibroadcastdataendpoint,webapifindtransactionhashesendpoint,webapigetneighborsendpoint,webapigettransactionobjectsbyhashendpoint,webapigettransactiontrytesbyhashendpoint
     volumes:
-      - ./mainnetdb/:/mainnetdb/:rw
-      - ./config.json:/config.json:ro
+      - ./config.docker.json:/tmp/config.json:ro
+    expose:
+      - "1888/tcp" # analysis server (within Docker network)
     networks: 
       - drandnetwork
-    ports:
-      - "14666:14666/tcp"
-      - "14626:14626/udp"
-      - "8080:8080/tcp"
-      - "8081:8081/tcp"
-  drand-client-1:
-    container_name: drand1
-    image: angelocapossele/drand:latest
-    entrypoint: /data/client-script.sh
+
+  peer_master:
+    container_name: peer_master
+    image: angelocapossele/goshimmer:drng
+    command: >
+      --config-dir=/tmp
+      --database.directory=/tmp/mainnetdb
+      --autopeering.seed=base58:8q491c3YWjbPwLmF2WD95YmCgh61j2kenCKHfGfByoWi
+      --node.enablePlugins=spammer,faucet,syncbeacon
+      --node.disablePlugins=syncbeaconfollower
+      --faucet.seed=7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
+      --valueLayer.snapshot.file=/tmp/assets/7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih.bin
+      --syncbeacon.broadcastInterval=5
+      --syncbeacon.startSynced=true
+      --drng.distributedPubKey=${DISTRIBUTED_PUB_KEY}
     volumes:
-      - ./data:/data:z
+      - ./config.json:/tmp/config.json:ro
+      - ./data/assets:/tmp/assets
+    ports:
+      - "0.0.0.0:8080:8080/tcp" # web API
+      - "127.0.0.1:8081:8081/tcp" # dashboard
+    networks: 
+      - drandnetwork
+    depends_on:
+      - entry_node
+
+  drand-client-1:
+    container_name: testdrng-drand_0
+    image: angelocapossele/drand:1.1.1
+    entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
     ports:
       - "8000:8000/tcp"
+      - "8800:8081/tcp"
     environment:
-      PORT: 8000
       LEADER: 1
+      GOSHIMMER: "http://peer_master:8080"
   drand-client-2:
     container_name: drand2
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8001:8001/tcp"
+      - "8001:8000/tcp"
+      - "8801:8081/tcp"
     environment:
-      PORT: 8001
+      GOSHIMMER: "http://peer_master:8080"
   drand-client-3:
     container_name: drand3
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8002:8002/tcp"
+      - "8002:8000/tcp"
+      - "8802:8081/tcp"
     environment:
-      PORT: 8002
+      GOSHIMMER: "http://peer_master:8080"
   drand-client-4:
     container_name: drand4
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8003:8003/tcp"
+      - "8003:8000/tcp"
+      - "8803:8081/tcp"
     environment:
-      PORT: 8003
+      GOSHIMMER: "http://peer_master:8080"
   drand-client-5:
     container_name: drand5
-    image: angelocapossele/drand:latest
+    image: angelocapossele/drand:1.1.1
     entrypoint: /data/client-script.sh
-    volumes:
-      - ./data:/data:z
     networks: 
       - drandnetwork
     ports:
-      - "8004:8004/tcp"
+      - "8004:8000/tcp"
+      - "8804:8081/tcp"
     environment:
-      PORT: 8004
+      GOSHIMMER: "http://peer_master:8080"
 
 networks:
   drandnetwork:

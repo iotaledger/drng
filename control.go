@@ -2,238 +2,452 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
-	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"time"
 
+	"github.com/briandowns/spinner"
+	"github.com/drand/drand/chain"
 	"github.com/drand/drand/core"
 	"github.com/drand/drand/key"
 	"github.com/drand/drand/net"
 	control "github.com/drand/drand/protobuf/drand"
 
 	json "github.com/nikkolasg/hexjson"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-// shareCmd decides whether the command is for a DKG or for a resharing and
-// dispatch to the respective sub-commands.
-func shareCmd(c *cli.Context) error {
-	if !c.Args().Present() {
-		fatal("drand: needs at least one group.toml file argument")
-	}
-	groupPath := c.Args().First()
-	groupPath, err := filepath.Abs(groupPath)
-	if err != nil {
-		fatal("can't open group path absolute path from %s", c.Args().First())
-	}
-	testEmptyGroup(groupPath)
+const minimumShareSecretLength = 32
 
-	if c.IsSet(oldGroupFlag.Name) {
-		testEmptyGroup(c.String(oldGroupFlag.Name))
-		fmt.Println("drand: old group file given for resharing protocol")
-		return initReshare(c, groupPath)
-	}
-
-	conf := contextToConfig(c)
-	fs := key.NewFileStore(conf.ConfigFolder())
-	_, errG := fs.LoadGroup()
-	_, errS := fs.LoadShare()
-	_, errD := fs.LoadDistPublic()
-	// XXX place that logic inside core/ directly with only one method
-	freshRun := errG != nil || errS != nil || errD != nil
-	if freshRun {
-		fmt.Println("drand: no current distributed key -> running DKG protocol.")
-		err = initDKG(c, groupPath)
-	} else {
-		fmt.Println("drand: found distributed key -> running resharing protocol.")
-		err = initReshare(c, groupPath)
-	}
-	return err
+type shareArgs struct {
+	secret    string
+	isTLS     bool
+	timeout   time.Duration
+	threshold int
+	entropy   *control.EntropyInfo
+	force     bool
+	conf      *core.Config
 }
 
-// initDKG indicates to the daemon to start the DKG protocol, as a leader or
-// not. The method waits until the DKG protocol finishes or an error occured.
-// If the DKG protocol finishes successfully, the beacon randomness loop starts.
-func initDKG(c *cli.Context, groupPath string) error {
-	// still trying to load it ourself now for the moment
-	// just to test if it's a valid thing or not
-	conf := contextToConfig(c)
-	client, err := net.NewControlClient(conf.ControlPort())
-	if err != nil {
-		fatal("drand: error creating control client: %s", err)
+func getShareArgs(c *cli.Context) (*shareArgs, error) {
+	var err error
+	args := new(shareArgs)
+	args.secret = c.String(secretFlag.Name)
+	if len(args.secret) < minimumShareSecretLength {
+		return nil, fmt.Errorf("secret is insecure. Should be at least %d characters", minimumShareSecretLength)
 	}
+
+	args.isTLS = !c.IsSet(insecureFlag.Name)
+
+	args.timeout, err = getTimeout(c)
+	if err != nil {
+		return nil, err
+	}
+
+	args.threshold, err = getThreshold(c)
+	if err != nil {
+		return nil, err
+	}
+
+	args.force = c.Bool(forceFlag.Name)
 
 	if c.IsSet(userEntropyOnlyFlag.Name) && !c.IsSet(sourceFlag.Name) {
 		fmt.Print("drand: userEntropyOnly needs to be used with the source flag, which is not specified here. userEntropyOnly flag is ignored.")
 	}
-	entropyInfo := entropyInfoFromReader(c)
-
-	fmt.Print("drand: waiting the end of DKG protocol ... " +
-		"(you can CTRL-C to not quit waiting)")
-
-	_, err = client.InitDKG(groupPath, c.Bool(leaderFlag.Name), c.String(timeoutFlag.Name), entropyInfo)
+	args.entropy, err = entropyInfoFromReader(c)
 	if err != nil {
-		fatal("drand: initdkg %s", err)
+		return nil, fmt.Errorf("error getting entropy source: %w", err)
 	}
-	return nil
+
+	args.conf = contextToConfig(c)
+
+	return args, nil
 }
 
-// initReshare indicates to the daemon to start the resharing protocol, as a
-// leader or not. The method waits until the resharing protocol finishes or
-// an error occured. TInfofhe "old group" toml is inferred either from the local
-// informations that the drand node is keeping (saved in filesystem), and can be
-// superseeded by the command line flag "old-group".
-// If the DKG protocol finishes successfully, the beacon randomness loop starts.
-// NOTE: If the contacted node is not present in the new list of nodes, the
-// waiting *can* be infinite in some cases. It's an issue that is low priority
-// though.
-func initReshare(c *cli.Context, newGroupPath string) error {
-	var isLeader = c.Bool(leaderFlag.Name)
-	var oldGroupPath string
-
-	if c.IsSet(oldGroupFlag.Name) {
-		oldGroupPath = c.String(oldGroupFlag.Name)
-	}
-	if oldGroupPath == "" {
-		fmt.Print("drand: old group path not specified. Using daemon's own group if possible.")
+func shareCmd(c *cli.Context) error {
+	if c.IsSet(transitionFlag.Name) || c.IsSet(oldGroupFlag.Name) {
+		return reshareCmd(c)
 	}
 
-	client := controlClient(c)
-	fmt.Println("drand: initiating resharing protocol. Waiting to the end ...")
-	_, err := client.InitReshare(oldGroupPath, newGroupPath, isLeader, c.String(timeoutFlag.Name))
+	if c.Bool(leaderFlag.Name) {
+		return leadShareCmd(c)
+	}
+
+	args, err := getShareArgs(c)
 	if err != nil {
-		fatal("drand: error resharing: %s", err)
+		return err
 	}
-	return nil
+	if !c.IsSet(connectFlag.Name) {
+		return fmt.Errorf("need to the address of the coordinator to create the group file")
+	}
+	coordAddress := c.String(connectFlag.Name)
+	connectPeer := net.CreatePeer(coordAddress, args.isTLS)
+
+	ctrlClient, err := net.NewControlClient(args.conf.ControlPort())
+	if err != nil {
+		return fmt.Errorf("could not create client: %v", err)
+	}
+
+	fmt.Fprintln(output, "Participating to the setup of the DKG")
+	groupP, shareErr := ctrlClient.InitDKG(connectPeer, args.entropy, args.secret)
+
+	if shareErr != nil {
+		return fmt.Errorf("error setting up the network: %v", shareErr)
+	}
+	group, err := key.GroupFromProto(groupP)
+	if err != nil {
+		return fmt.Errorf("error interpreting the group from protobuf: %v", err)
+	}
+	return groupOut(c, group)
 }
 
-func getShare(c *cli.Context) error {
-	client := controlClient(c)
-	resp, err := client.Share()
-	if err != nil {
-		fatal("drand: could not request the share: %s", err)
+func leadShareCmd(c *cli.Context) error {
+	if !c.IsSet(thresholdFlag.Name) || !c.IsSet(shareNodeFlag.Name) {
+		return fmt.Errorf("leader needs to specify --nodes and --threshold for sharing")
 	}
-	printJSON(resp)
-	return nil
+
+	args, err := getShareArgs(c)
+	if err != nil {
+		return err
+	}
+
+	nodes := c.Int(shareNodeFlag.Name)
+	if nodes <= 1 {
+		fmt.Fprintln(output, "Warning: less than 2 nodes is an unsupported, degenerate mode.")
+	}
+
+	ctrlClient, err := net.NewControlClient(args.conf.ControlPort())
+	if err != nil {
+		return fmt.Errorf("could not create client: %v", err)
+	}
+
+	if !c.IsSet(periodFlag.Name) {
+		return fmt.Errorf("leader flag indicated requires the beacon period flag as well")
+	}
+	periodStr := c.String(periodFlag.Name)
+	period, err := time.ParseDuration(periodStr)
+	if err != nil {
+		return fmt.Errorf("period given is invalid: %v", err)
+	}
+	catchupPeriod := time.Duration(0)
+	catchupPeriodStr := c.String(catchupPeriodFlag.Name)
+	if catchupPeriod, err = time.ParseDuration(catchupPeriodStr); err != nil {
+		return fmt.Errorf("catchup period given is invalid: %v", err)
+	}
+
+	offset := int(core.DefaultGenesisOffset.Seconds())
+	if c.IsSet(beaconOffset.Name) {
+		offset = c.Int(beaconOffset.Name)
+	}
+	fmt.Fprintln(output, "Initiating the DKG as a leader")
+	fmt.Fprintln(output, "You can stop the command at any point. If so, the group "+
+		"file will not be written out to the specified output. To get the "+
+		"group file once the setup phase is done, you can run the `drand show "+
+		"group` command")
+	groupP, shareErr := ctrlClient.InitDKGLeader(nodes, args.threshold, period, catchupPeriod, args.timeout, args.entropy, args.secret, offset)
+
+	if shareErr != nil {
+		return fmt.Errorf("error setting up the network: %v", shareErr)
+	}
+	group, err := key.GroupFromProto(groupP)
+	if err != nil {
+		return fmt.Errorf("error interpreting the group from protobuf: %v", err)
+	}
+	return groupOut(c, group)
+}
+
+func reshareCmd(c *cli.Context) error {
+	if c.Bool(leaderFlag.Name) {
+		return leadReshareCmd(c)
+	}
+
+	args, err := getShareArgs(c)
+	if err != nil {
+		return err
+	}
+
+	if !c.IsSet(connectFlag.Name) {
+		return fmt.Errorf("need to the address of the coordinator to create the group file")
+	}
+	coordAddress := c.String(connectFlag.Name)
+	connectPeer := net.CreatePeer(coordAddress, args.isTLS)
+
+	ctrlClient, err := net.NewControlClient(args.conf.ControlPort())
+	if err != nil {
+		return fmt.Errorf("could not create client: %v", err)
+	}
+
+	// resharing case needs the previous group
+	var oldPath string
+	if c.IsSet(transitionFlag.Name) {
+		// daemon will try to the load the one stored
+		oldPath = ""
+	} else if c.IsSet(oldGroupFlag.Name) {
+		var oldGroup = new(key.Group)
+		if err := key.Load(c.String(oldGroupFlag.Name), oldGroup); err != nil {
+			return fmt.Errorf("could not load drand from path: %s", err)
+		}
+		oldPath = c.String(oldGroupFlag.Name)
+	}
+
+	fmt.Fprintln(output, "Participating to the resharing")
+	groupP, shareErr := ctrlClient.InitReshare(connectPeer, args.secret, oldPath, args.force)
+	if shareErr != nil {
+		return fmt.Errorf("error setting up the network: %v", shareErr)
+	}
+	group, err := key.GroupFromProto(groupP)
+	if err != nil {
+		return fmt.Errorf("error interpreting the group from protobuf: %v", err)
+	}
+	return groupOut(c, group)
+}
+
+func leadReshareCmd(c *cli.Context) error {
+	args, err := getShareArgs(c)
+	if err != nil {
+		return err
+	}
+
+	if !c.IsSet(thresholdFlag.Name) || !c.IsSet(shareNodeFlag.Name) {
+		return fmt.Errorf("leader needs to specify --nodes and --threshold for sharing")
+	}
+
+	nodes := c.Int(shareNodeFlag.Name)
+
+	ctrlClient, err := net.NewControlClient(args.conf.ControlPort())
+	if err != nil {
+		return fmt.Errorf("could not create client: %v", err)
+	}
+
+	// resharing case needs the previous group
+	var oldPath string
+	if c.IsSet(transitionFlag.Name) {
+		// daemon will try to the load the one stored
+		oldPath = ""
+	} else if c.IsSet(oldGroupFlag.Name) {
+		var oldGroup = new(key.Group)
+		if err := key.Load(c.String(oldGroupFlag.Name), oldGroup); err != nil {
+			return fmt.Errorf("could not load drand from path: %s", err)
+		}
+		oldPath = c.String(oldGroupFlag.Name)
+	}
+
+	offset := int(core.DefaultResharingOffset.Seconds())
+	if c.IsSet(beaconOffset.Name) {
+		offset = c.Int(beaconOffset.Name)
+	}
+	catchupPeriod := time.Duration(-1)
+	if c.IsSet(catchupPeriodFlag.Name) {
+		catchupPeriodStr := c.String(catchupPeriodFlag.Name)
+		if catchupPeriod, err = time.ParseDuration(catchupPeriodStr); err != nil {
+			return fmt.Errorf("catchup period given is invalid: %v", err)
+		}
+	}
+	fmt.Fprintln(output, "Initiating the resharing as a leader")
+	groupP, shareErr := ctrlClient.InitReshareLeader(nodes, args.threshold, args.timeout, catchupPeriod, args.secret, oldPath, offset)
+
+	if shareErr != nil {
+		return fmt.Errorf("error setting up the network: %v", shareErr)
+	}
+	group, err := key.GroupFromProto(groupP)
+	if err != nil {
+		return fmt.Errorf("error interpreting the group from protobuf: %v", err)
+	}
+	return groupOut(c, group)
+}
+
+func getTimeout(c *cli.Context) (timeout time.Duration, err error) {
+	if c.IsSet(timeoutFlag.Name) {
+		str := c.String(timeoutFlag.Name)
+		return time.ParseDuration(str)
+	}
+	return core.DefaultDKGTimeout, nil
 }
 
 func pingpongCmd(c *cli.Context) error {
-	client := controlClient(c)
-	if err := client.Ping(); err != nil {
-		fatal("drand: can't ping the daemon ... %s", err)
+	client, err := controlClient(c)
+	if err != nil {
+		return err
 	}
-	fmt.Printf("drand daemon is alive on port %s", controlPort(c))
+	if err := client.Ping(); err != nil {
+		return fmt.Errorf("drand: can't ping the daemon ... %s", err)
+	}
+	fmt.Fprintf(output, "drand daemon is alive on port %s", controlPort(c))
 	return nil
 }
 
 func showGroupCmd(c *cli.Context) error {
-	client := controlClient(c)
+	client, err := controlClient(c)
+	if err != nil {
+		return err
+	}
 	r, err := client.GroupFile()
 	if err != nil {
-		fatal("drand: fetching group file error: %s", err)
+		return fmt.Errorf("fetching group file error: %s", err)
 	}
-
-	if c.IsSet(outFlag.Name) {
-		filePath := c.String(outFlag.Name)
-		err := ioutil.WriteFile(filePath, []byte(r.GroupToml), 0750)
-		if err != nil {
-			fatal("drand: can't write to file: %s", err)
-		}
-		fmt.Printf("group file written to %s", filePath)
-	} else {
-		fmt.Printf("\n\n%s", r.GroupToml)
+	group, err := key.GroupFromProto(r)
+	if err != nil {
+		return err
 	}
-	return nil
+	return groupOut(c, group)
 }
 
-func showCokeyCmd(c *cli.Context) error {
-	client := controlClient(c)
-	resp, err := client.CollectiveKey()
+func showChainInfo(c *cli.Context) error {
+	client, err := controlClient(c)
 	if err != nil {
-		fatal("drand: could not request drand.cokey: %s", err)
+		return err
 	}
-	printJSON(resp)
-	return nil
+	resp, err := client.ChainInfo()
+	if err != nil {
+		return fmt.Errorf("could not request chain info: %s", err)
+	}
+	ci, err := chain.InfoFromProto(resp)
+	if err != nil {
+		return fmt.Errorf("could not get correct chain info: %s", err)
+	}
+	return printChainInfo(c, ci)
 }
 
 func showPrivateCmd(c *cli.Context) error {
-	client := controlClient(c)
+	client, err := controlClient(c)
+	if err != nil {
+		return err
+	}
 	resp, err := client.PrivateKey()
 	if err != nil {
-		fatal("drand: could not request drand.private: %s", err)
+		return fmt.Errorf("could not request drand.private: %s", err)
 	}
-
-	printJSON(resp)
-	return nil
+	return printJSON(resp)
 }
 
 func showPublicCmd(c *cli.Context) error {
-	client := controlClient(c)
+	client, err := controlClient(c)
+	if err != nil {
+		return err
+	}
 	resp, err := client.PublicKey()
 	if err != nil {
-		fatal("drand: could not request drand.public: %s", err)
+		return fmt.Errorf("drand: could not request drand.public: %s", err)
 	}
-
-	printJSON(resp)
-	return nil
+	return printJSON(resp)
 }
 
 func showShareCmd(c *cli.Context) error {
-	client := controlClient(c)
+	client, err := controlClient(c)
+	if err != nil {
+		return err
+	}
 	resp, err := client.Share()
 	if err != nil {
-		fatal("drand: could not request drand.share: %s", err)
+		return fmt.Errorf("could not request drand.share: %s", err)
 	}
-
-	printJSON(resp)
-	return nil
+	return printJSON(resp)
 }
 
 func controlPort(c *cli.Context) string {
-	port := c.String("control")
+	port := c.String(controlFlag.Name)
 	if port == "" {
 		port = core.DefaultControlPort
 	}
 	return port
 }
 
-func controlClient(c *cli.Context) *net.ControlClient {
+func controlClient(c *cli.Context) (*net.ControlClient, error) {
 	port := controlPort(c)
 	client, err := net.NewControlClient(port)
 	if err != nil {
-		fatal("drand: can't instantiate control client: %s", err)
+		return nil, fmt.Errorf("can't instantiate control client: %s", err)
 	}
-	return client
+	return client, nil
 }
 
-func printJSON(j interface{}) {
+func printJSON(j interface{}) error {
 	buff, err := json.MarshalIndent(j, "", "    ")
 	if err != nil {
-		fatal("drand: could not JSON marshal: %s", err)
+		return fmt.Errorf("could not JSON marshal: %s", err)
 	}
-	fmt.Println(string(buff))
-}
-func fileExists(name string) bool {
-	if _, err := os.Stat(name); err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
-	}
-	return true
+	fmt.Fprintln(output, string(buff))
+	return nil
 }
 
-func entropyInfoFromReader(c *cli.Context) *control.EntropyInfo {
+func entropyInfoFromReader(c *cli.Context) (*control.EntropyInfo, error) {
 	if c.IsSet(sourceFlag.Name) {
 		_, err := os.Lstat(c.String(sourceFlag.Name))
 		if err != nil {
-			fatal("drand: cannot use given entropy source: %s", err)
+			return nil, fmt.Errorf("cannot use given entropy source: %s", err)
 		}
 		source := c.String(sourceFlag.Name)
 		ei := &control.EntropyInfo{
 			Script:   source,
 			UserOnly: c.Bool(userEntropyOnlyFlag.Name),
 		}
-		return ei
+		return ei, nil
 	}
+	return nil, nil
+}
+func selfSign(c *cli.Context) error {
+	conf := contextToConfig(c)
+	fs := key.NewFileStore(conf.ConfigFolder())
+	pair, err := fs.LoadKeyPair()
+	if err != nil {
+		return fmt.Errorf("loading private/public: %s", err)
+	}
+	if pair.Public.ValidSignature() == nil {
+		fmt.Fprintln(output, "Public identity already self signed.")
+		return nil
+	}
+	pair.SelfSign()
+	if err := fs.SaveKeyPair(pair); err != nil {
+		return fmt.Errorf("saving identity: %s", err)
+	}
+	fmt.Fprintln(output, "Public identity self signed")
+	fmt.Fprintln(output, printJSON(pair.Public.TOML()))
 	return nil
+}
+
+const refreshRate = 1000 * time.Millisecond
+
+func followCmd(c *cli.Context) error {
+	ctrlClient, err := controlClient(c)
+	if err != nil {
+		return fmt.Errorf("unable to create control client: %s", err)
+	}
+	addrs := strings.Split(c.String(syncNodeFlag.Name), ",")
+	channel, errCh, err := ctrlClient.StartFollowChain(
+		c.Context,
+		c.String(hashInfoFlag.Name),
+		addrs,
+		!c.Bool(insecureFlag.Name),
+		uint64(c.Int(upToFlag.Name)))
+	if err != nil {
+		return fmt.Errorf("error asking to follow chain: %s", err)
+	}
+	var current uint64
+	var target uint64
+	s := spinner.New(spinner.CharSets[9], refreshRate)
+	s.PreUpdate = func(spin *spinner.Spinner) {
+		curr := atomic.LoadUint64(&current)
+		tar := atomic.LoadUint64(&target)
+		spin.Suffix = fmt.Sprintf("  synced round up to %d "+
+			"- current target %d"+
+			"\t--> %.3f %% - "+
+			"Waiting on new rounds...", curr, tar, 100*float64(curr)/float64(tar))
+	}
+	s.FinalMSG = "Follow stopped"
+	s.Start()
+	defer s.Stop()
+	for {
+		select {
+		case progress := <-channel:
+			atomic.StoreUint64(&current, progress.Current)
+			atomic.StoreUint64(&target, progress.Target)
+		case err := <-errCh:
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf("errror on following the chain: %s", err)
+		}
+	}
 }

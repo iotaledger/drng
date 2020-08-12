@@ -1,18 +1,19 @@
 {
   "analysis": {
     "client": {
-      "serverAddress": "node1.goshimmer.dev:188"
+      "serverAddress": "entry_node:1888"
     },
     "server": {
-      "port": 0
+      "bindAddress": "0.0.0.0:1888"
     },
-    "httpServer": {
-      "bindAddress": "0.0.0.0:80"
+    "dashboard": {
+      "bindAddress": "0.0.0.0:9000",
+      "dev": false
     }
   },
   "autopeering": {
     "entryNodes": [
-      "MRCJTGX9x+PPiT3um1DQSHXvALaUg/tCH/oQr6mliGo=@35.246.104.243:14626"
+      "DLoMdp3nJ7jnFT1K13R2m5nZN7ijLcmaZhCdTPJs2duo@entry_node:14626"
     ],
     "port": 14626
   },
@@ -31,20 +32,10 @@
   "drng": {
     "instanceId": 1,
     "threshold": 3,
-    "distributedPubKey": "8ed27b059bbb314966660d1fb2ce5b146e6af33d729ab434c5024049c7b9f826eb354db991e4e81d4c820d2d024c8c2b",
-    "committeeMembers": [
-      "1807041d28e63ead53a9dc26f3e59fc6917be2b1e3f79dd0a2f4d58732ddcfd7"
-    ]
+    "committeeMembers": ["EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP"]
   },
   "gossip": {
     "port": 14666
-  },
-  "graph": {
-    "bindAddress": "127.0.0.1:8082",
-    "domain": "",
-    "networkName": "GoShimmer",
-    "socketIOPath": "socket.io-client/dist/socket.io.js",
-    "webrootPath": "IOTAtangle/webroot"
   },
   "logger": {
     "level": "info",
@@ -52,8 +43,7 @@
     "disableStacktrace": false,
     "encoding": "console",
     "outputPaths": [
-      "stdout",
-      "goshimmer.log"
+      "stdout"
     ],
     "disableEvents": true,
     "remotelog": {
@@ -67,6 +57,11 @@
   "node": {
     "disablePlugins": "portcheck",
     "enablePlugins": []
+  },
+  "pow": {
+    "difficulty": 2,
+    "numThreads": 1,
+    "timeout": "10s"
   },
   "webapi": {
     "auth": {
