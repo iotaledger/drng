@@ -85,7 +85,8 @@ nodes generating randomness for GoShimmer. On a high-level, the workflow looks l
 ### Setup
 The setup process for a drand node consists of two steps:
 1. Generate the long-term key pair for each node
-2. Setup the group configuration file
+3. Start the drand deamon
+2. Start the distributed key generation process
 
 #### Long-Term Key
 To generate the long-term key pair `drand_id.{secret,public}` of the drand
@@ -112,66 +113,6 @@ Key = "b03293e70589d34341ab9f141e7a57b43441083823fd4fab13d1900047c00c0337d6c5124
 TLS = false
 ```
 
-#### Group Configuration
-All informations regarding a group of drand nodes necessary for drand to
-function properly are located inside a group.toml configuration file. To run a
-DKG protocol, one needs to generate this group configuration file from all
-individual long-term keys generated in the previous step. One can do so with:
-```
-drand group <pk1> <pk2> ... <pkn>
-```
-where `<pki>` is the public key file `drand_id.public` of the i-th participant.
-The group file is generated in the current directory under `group.toml`.
-**NOTE:** At this stage, this group file MUST be distributed to all
-participants!
-
-A `group.toml` file should look like:
-
-```toml
-Threshold = 3
-Period = "10s"
-
-[[Nodes]]
-Address = "172.16.222.3:8000"
-Key = "b03293e70589d34341ab9f141e7a57b43441083823fd4fab13d1900047c00c0337d6c51248bd33ab0f844143b469509a"
-TLS = false
-
-[[Nodes]]
-Address = "172.16.222.2:8004"
-Key = "a29f454f40aad47cf5c7f2a42ce3d0fb8765b7bf2c65176aaeee5fa922aa2ba45c959e59afc8af6abf1eb508de44e822"
-TLS = false
-
-[[Nodes]]
-Address = "172.16.222.4:8001"
-Key = "8b66bfaa83e6fee3e1f3c3952ae1b6b16afccc411d5fd7ab31f3e2e3eb67d7eddcaf9f5b5a51dec2ba0f0fd147d636d4"
-TLS = false
-
-[[Nodes]]
-Address = "172.16.222.5:8000"
-Key = "8b11d779c53574b78c0321f63239e973454bc933f8796020a9dfc95bca593dcdfd87f8996cceca5782f2c5f09b5e3e5a"
-TLS = false
-
-[[Nodes]]
-Address = "172.16.222.6:8003"
-Key = "aac5f76016ece3ff96fd356991b3c1a965af05d09bef5c3d3bbd872e71e2155338e6d63f128b1a6378a47b75a0aa2c19"
-TLS = false
-```
-
-##### Randomness Beacon Period
-drand updates the configuration file after the DKG protocol finishes, with the
-distributed public key and automatically starts running the randomness beacon.
-By default, a randomness beacon has a period of 1mn, I.E. new randomness is
-generated every minute. If you wish to change the period, you must include that
-information **inside** the group configuration file. You can do by appending a
-flag to the command such as :
-```
-drand group --period 2m <pk1> <pk2> ... <pkn>
-```
-
-Or simply by editing manually the group file afterwards: it's a TOML
-configuration file. The period must be readable by the
-[time](https://golang.org/pkg/time/#ParseDuration) package.
-
 ### Starting drand daemon
 The daemon does not go automatically in background, so you must run it with ` &
 ` in your terminal, within a screen / tmux session, or with the `-d` option
@@ -184,51 +125,48 @@ drand start --tls-disable --goshimmerAPIurl <http://address:port>
 ```
 For example:
 ```bash
-drand start --tls-disable --goshimmerAPIurl "http://172.16.222.5:8080" 
+drand start --tls-disable --private-listen 0.0.0.0:8000 --public-listen 0.0.0.0:8081 --goshimmerAPIurl "http://172.16.222.5:8080" 
 ```
+Where `private-listen` and `public-listen` define the private and public API endpoints respectively.
+
 *Note:* altough running drand without *TLS* makes the protocol insecure, we suggest doing so to lower the entry barrier for being able to run a drand server.
 
 ### Distributed Key Generation
 After running all drand daemons, each operator needs to issue a command to
-start the DKG protocol, using the group file generated before. One can do so
-using the control client with:
+start the DKG protocol. One can do so using the control client with:
 ```
-drand share <group-file>  --timeout 10s
+drand share --connect "leader_addr:port" --tls-disable --nodes 5 --threshold 3 --secret "secret_string"
 ```
 
 One of the nodes has to function as the leader to initiate the DKG protocol (no
 additional trust assumptions), he can do so with:
 ```
-drand share --leader <group-file>
+drand share --leader --nodes 5 --threshold 3 --secret "secret_string" --period 10s
 ```
 
 Once running, the leader initiates the distributed key generation protocol to
 compute the distributed public key (`dist_key.public`) and the private key
-shares (`dist_key.private`) together with the participants specified in
-`drand_group.toml`. Once the DKG has finished, the keys are stored as
+shares (`dist_key.private`) together with the other participants. 
+Once the DKG has finished, the keys are stored as
 `$HOME/.drand/groups/dist_key.{public,private}`.
 
-The timeout is an optional parameter indicating the maximum timeout the DKG
-protocol will wait. If there are some failed nodes during the DKG, then the DKG
-will finish only after the given timeout. The default value is set to 10s (see
-[`core/constants.go`](https://github.com/dedis/drand/blob/master/core/constants.go)
-file).
+The `secret_string` has to be at least 32bytes long and all the participants must use the same.
 
 **Distributed Public Key**: More generally, for third party implementation of
 randomness beacon verification, one only needs the distributed public key. If
 you are an administrator of a drand node, you can use the control port as the
 following:
 ```bash
-drand show cokey
+drand show chain-info
 ```
 
-Otherwise, you can use the exposed API: `/api/info/distkey`.
+Otherwise, you can use the exposed API: `/info`.
 
 ### GoShimmer configuration
 To configure the GoShimmer node to use a given dRNG committee, you need to fill the `drng` section of the GoShimmer `config.json` file, where:
 + *instanceId* is the identifier of the committee;
 + *threshold* is the threshold for reconstructing the collective signature;
-+ *distributedPubKey* is the distributed public key generated by the committee during the DKG phase ( you can retrieve this by using the API: `/api/info/distkey` on any of the committee address);
++ *distributedPubKey* is the distributed public key generated by the committee during the DKG phase ( you can retrieve this by using the API: `/info` on any of the committee address);
 + *commiteeMembers* is the list of the public keys belonging to the GoShimmer nodes of the committee (you can retrieve this by using the API: `/info` on your GoShimmer node).
 
 An example of such a configuration is:
