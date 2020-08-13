@@ -106,7 +106,6 @@ drand generate-keypair --tls-disable 172.16.222.3:8000
 
 You should get something like:
 ```toml
-You can copy paste the following snippet to a common group.toml file:
 [[Nodes]]
 Address = "172.16.222.3:8000"
 Key = "b03293e70589d34341ab9f141e7a57b43441083823fd4fab13d1900047c00c0337d6c51248bd33ab0f844143b469509a"
