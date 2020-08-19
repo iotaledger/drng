@@ -258,7 +258,7 @@ var appCommands = []*cli.Command{
 		Flags: toArray(folderFlag, tlsCertFlag, tlsKeyFlag,
 			insecureFlag, controlFlag, privListenFlag, pubListenFlag, metricsFlag,
 			certsDirFlag, pushFlag, verboseFlag, enablePrivateRand, oldGroupFlag, skipValidationFlag,
-			goshimmerAPIurl),
+			goshimmerAPIurl, instanceID),
 		Action: func(c *cli.Context) error {
 			banner()
 			return startCmd(c)
@@ -755,6 +755,9 @@ func contextToConfig(c *cli.Context) *core.Config {
 		drandClient = drandclient
 		api = client.NewGoShimmerAPI(c.String("goshimmerAPIurl"))
 		opts = append(opts, core.WithBeaconCallback(beaconCallback))
+	}
+	if c.IsSet("instanceID") {
+		dRNGInstance = uint32(c.Uint("instanceID"))
 	}
 	conf := core.NewConfig(opts...)
 	return conf

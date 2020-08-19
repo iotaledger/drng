@@ -13,12 +13,20 @@ import (
 var (
 	drandClient *net.ControlClient
 	api         *client.GoShimmerAPI
+
+	dRNGInstance = uint32(1)
 )
 
 var goshimmerAPIurl = &cli.StringFlag{
 	Name:  "goshimmerAPIurl",
 	Value: "http://127.0.0.1:8080",
 	Usage: "The address of the goshimmer API",
+}
+
+var instanceID = &cli.UintFlag{
+	Name:  "instanceID",
+	Value: 1,
+	Usage: "The instanceID of the dRNG",
 }
 
 func getCoKey(client *net.ControlClient) ([]byte, error) {
@@ -36,7 +44,7 @@ func beaconCallback(b *chain.Beacon) {
 		return
 	}
 	cb := payload.New(
-		1,
+		dRNGInstance,
 		b.Round,
 		b.PreviousSig,
 		b.Signature,
