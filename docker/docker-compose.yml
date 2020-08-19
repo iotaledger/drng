@@ -11,5 +11,5 @@ services:
     environment:
       - DRAND_PUBLIC_ADDRESS=172.0.0.1:1234
     entrypoint: /usr/local/bin/entrypoint.sh
-    command: start --verbose --private-listen 0.0.0.0:8000 --public-listen 0.0.0.0:8081 --tls-disable --goshimmerAPIurl "http://127.0.0.1:8080"
+    command: start --verbose --private-listen 0.0.0.0:8000 --public-listen 0.0.0.0:8081 --tls-disable --goshimmerAPIurl "http://127.0.0.1:8080" --instanceID 1
     restart: unless-stopped
