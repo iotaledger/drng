@@ -50,10 +50,12 @@ func beaconCallback(b *chain.Beacon) {
 		b.Signature,
 		coKey)
 
-	msgId, err := api.BroadcastCollectiveBeacon(cb.Bytes())
-	if err != nil {
-		fmt.Println("Error writing on the Tangle: ", err.Error())
-		return
-	}
-	fmt.Println("Beacon written on the Tangle with msgID: ", msgId)
+	go func() {
+		msgId, err := api.BroadcastCollectiveBeacon(cb.Bytes())
+		if err != nil {
+			fmt.Println("Error writing on the Tangle: ", err.Error())
+			return
+		}
+		fmt.Println("Beacon written on the Tangle with msgID: ", msgId)
+	}()
 }

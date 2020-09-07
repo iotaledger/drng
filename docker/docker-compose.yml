@@ -2,14 +2,15 @@ version: '3'
 
 services:
   drand:
-    image: angelocapossele/drand:1.1.1
+    image: angelocapossele/drand:1.1.2
     volumes:
       - ./data:/root/.drand
     ports:
       - "0.0.0.0:1234:8000"
       - "0.0.0.0:1235:8081"
+      - "0.0.0.0:1236:1236"
     environment:
       - DRAND_PUBLIC_ADDRESS=172.0.0.1:1234
     entrypoint: /usr/local/bin/entrypoint.sh
-    command: start --verbose --private-listen 0.0.0.0:8000 --public-listen 0.0.0.0:8081 --tls-disable --goshimmerAPIurl "http://127.0.0.1:8080" --instanceID 1
+    command: start --verbose --private-listen 0.0.0.0:8000 --public-listen 0.0.0.0:8081 --tls-disable --goshimmerAPIurl "http://127.0.0.1:8080" --instanceID 1 --metrics "0.0.0.0:1236"
     restart: unless-stopped

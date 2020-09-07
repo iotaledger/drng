@@ -18,10 +18,10 @@ sleep 5
 # Now nodes wait for the leader to run DKG; leader starts DKG
 if [[ "$LEADER" == 1 ]]; then
     echo "Running DKG..."
-    drand share --leader --nodes 5 --threshold 3 --secret "0Q0rRqhUX99nn4SoYME90McZKk+MNtx0OLT5/HTk1tE=" --period 10s
+    drand share --leader --nodes 5 --threshold 3 --secret "0Q0rRqhUX99nn4SoYME90McZKk+MNtx0OLT5/HTk1tE=" --period 10s --catchup-period 0
 else
     sleep 5
-    drand share --connect "testdrng-drand_0:8000" --tls-disable --nodes 5 --threshold 3 --secret "0Q0rRqhUX99nn4SoYME90McZKk+MNtx0OLT5/HTk1tE="
+    drand share --connect "testdrng-drand_0:8000" --tls-disable --nodes 5 --threshold 3 --secret "0Q0rRqhUX99nn4SoYME90McZKk+MNtx0OLT5/HTk1tE=" --catchup-period 0
 fi
 
 # Let the deamon alive for long enough
