@@ -17,7 +17,7 @@ require (
 	github.com/gobuffalo/envy v1.9.0 // indirect
 	github.com/google/open-location-code/go v0.0.0-20190903173953-119bc96a3a51 // indirect
 	github.com/googollee/go-engine.io v1.4.2
-	github.com/iotaledger/goshimmer v0.2.2-0.20200810173059-e12f3e084380
+	github.com/iotaledger/goshimmer v0.2.4-0.20200910212946-2f8fc1f8bbbd
 	github.com/kabukky/httpscerts v0.0.0-20150320125433-617593d7dcb3
 	github.com/karrick/godirwalk v1.15.6 // indirect
 	github.com/kilic/bls12-381 v0.0.0-20200731194930-64c428e1bff5 // indirect

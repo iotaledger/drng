@@ -2,7 +2,7 @@ version: '3'
 
 services:
   drand:
-    image: angelocapossele/drand:1.1.2
+    image: angelocapossele/drand:1.1.3
     volumes:
       - ./data:/root/.drand
     ports:
