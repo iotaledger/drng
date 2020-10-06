@@ -31,7 +31,7 @@ services:
       --valueLayer.snapshot.file=/tmp/assets/7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih.bin
       --syncbeacon.broadcastInterval=5
       --syncbeacon.startSynced=true
-      --drng.distributedPubKey=${DISTRIBUTED_PUB_KEY}
+      --drng.custom.distributedPubKey=${DISTRIBUTED_PUB_KEY}
     volumes:
       - ./config.json:/tmp/config.json:ro
       - ./data/assets:/tmp/assets
@@ -45,7 +45,7 @@ services:
 
   drand-client-1:
     container_name: testdrng-drand_0
-    image: angelocapossele/drand:1.1.1
+    image: angelocapossele/drand:1.1.3
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -57,7 +57,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-2:
     container_name: drand2
-    image: angelocapossele/drand:1.1.1
+    image: angelocapossele/drand:1.1.3
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -68,7 +68,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-3:
     container_name: drand3
-    image: angelocapossele/drand:1.1.1
+    image: angelocapossele/drand:1.1.3
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -79,7 +79,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-4:
     container_name: drand4
-    image: angelocapossele/drand:1.1.1
+    image: angelocapossele/drand:1.1.3
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
@@ -90,7 +90,7 @@ services:
       GOSHIMMER: "http://peer_master:8080"
   drand-client-5:
     container_name: drand5
-    image: angelocapossele/drand:1.1.1
+    image: angelocapossele/drand:1.1.3
     entrypoint: /data/client-script.sh
     networks: 
       - drandnetwork
