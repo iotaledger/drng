@@ -3,7 +3,7 @@ version: '3'
 services:
   entry_node:
     container_name: entry_node
-    image: angelocapossele/goshimmer:develop
+    image: angelocapossele/goshimmer:drng
     command: >
       --autopeering.seed=base58:8kPPCqaJFAt8BJtx6qw5PN8bKEM2XKXor6PxkmHf6bcr
       --autopeering.entryNodes=
@@ -20,7 +20,7 @@ services:
 
   peer_master:
     container_name: peer_master
-    image: angelocapossele/goshimmer:develop
+    image: angelocapossele/goshimmer:drng
     command: >
       --config-dir=/tmp
       --database.directory=/tmp/mainnetdb
