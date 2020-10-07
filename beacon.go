@@ -6,7 +6,7 @@ import (
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/net"
 	"github.com/iotaledger/goshimmer/client"
-	"github.com/iotaledger/goshimmer/packages/binary/drng/subtypes/collectivebeacon/payload"
+	"github.com/iotaledger/goshimmer/packages/drng"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,6 +21,16 @@ var goshimmerAPIurl = &cli.StringFlag{
 	Name:  "goshimmerAPIurl",
 	Value: "http://127.0.0.1:8080",
 	Usage: "The address of the goshimmer API",
+}
+
+var goshimmerAPIusername = &cli.StringFlag{
+	Name:  "goshimmerAPIusername",
+	Usage: "The username of the goshimmer API basic-auth",
+}
+
+var goshimmerAPIpassword = &cli.StringFlag{
+	Name:  "goshimmerAPIpassword",
+	Usage: "The password of the goshimmer API basic-auth",
 }
 
 var instanceID = &cli.UintFlag{
@@ -43,7 +53,7 @@ func beaconCallback(b *chain.Beacon) {
 		fmt.Println("Error writing on the Tangle: ", err.Error())
 		return
 	}
-	cb := payload.New(
+	cb := drng.NewCollectiveBeaconPayload(
 		dRNGInstance,
 		b.Round,
 		b.PreviousSig,

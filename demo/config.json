@@ -66,11 +66,11 @@
     "timeout": "10s"
   },
   "webapi": {
-    "auth": {
-      "password": "goshimmer",
-      "privateKey": "",
-      "username": "goshimmer"
-    },
-    "bindAddress": "0.0.0.0:8080"
+    "bindAddress": "0.0.0.0:8080",
+    "basic_auth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    }
   }
 }
