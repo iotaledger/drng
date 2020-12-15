@@ -17,7 +17,7 @@ require (
 	github.com/gobuffalo/envy v1.9.0 // indirect
 	github.com/google/open-location-code/go v0.0.0-20190903173953-119bc96a3a51 // indirect
 	github.com/googollee/go-engine.io v1.4.2
-	github.com/iotaledger/goshimmer v0.2.4-0.20200910212946-2f8fc1f8bbbd
+	github.com/iotaledger/goshimmer v0.3.2-0.20201210090811-116c6e00d588
 	github.com/kabukky/httpscerts v0.0.0-20150320125433-617593d7dcb3
 	github.com/karrick/godirwalk v1.15.6 // indirect
 	github.com/kilic/bls12-381 v0.0.0-20200731194930-64c428e1bff5 // indirect
@@ -39,11 +39,5 @@ require (
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/valyala/fasttemplate v1.2.0 // indirect
 	go.mongodb.org/mongo-driver v1.4.0 // indirect
-	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de // indirect
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
-	golang.org/x/sys v0.0.0-20200810151505-1b9f1253b3ed // indirect
-	google.golang.org/genproto v0.0.0-20200808173500-a06252235341 // indirect
-	google.golang.org/grpc v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.57.0 // indirect
 )

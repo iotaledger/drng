@@ -6,7 +6,7 @@ import (
 	"github.com/drand/drand/chain"
 	"github.com/drand/drand/net"
 	"github.com/iotaledger/goshimmer/client"
-	"github.com/iotaledger/goshimmer/packages/binary/drng/subtypes/collectivebeacon/payload"
+	"github.com/iotaledger/goshimmer/packages/drng"
 	"github.com/urfave/cli/v2"
 )
 
@@ -43,7 +43,7 @@ func beaconCallback(b *chain.Beacon) {
 		fmt.Println("Error writing on the Tangle: ", err.Error())
 		return
 	}
-	cb := payload.New(
+	cb := drng.NewCollectiveBeaconPayload(
 		dRNGInstance,
 		b.Round,
 		b.PreviousSig,
